@@ -1,0 +1,22 @@
+services:
+  outline_claw:
+    build: .
+    environment:
+      WORKSPACE_REPO: ${WORKSPACE_REPO}
+      WORKSPACE_REPO_DIR: /data/repo
+      OUTLINE_URL: ${OUTLINE_URL}
+      OUTLINE_TOKEN: ${OUTLINE_TOKEN}
+      OUTLINE_ROOT_DOC: ${OUTLINE_ROOT_DOC:-}
+      OPENCLAW_HOME: /data/openclaw
+      # SYNC_MODE: "true"
+      # ALLOWED_ORIGINS: "http://localhost:3349,https://myhost.example.com"
+      # GATEWAY_TOKEN: "my-secret-token"
+    ports:
+      - "3349:3000"
+    volumes:
+      - openclaw_outline_state:/data/openclaw
+    tty: true
+    stdin_open: true
+
+volumes:
+  openclaw_outline_state:

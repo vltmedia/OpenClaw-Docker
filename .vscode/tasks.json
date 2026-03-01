@@ -1,0 +1,129 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Docker",
+      "type": "shell",
+      "command": "docker build -t openclaw-agent .",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Docker",
+      "type": "shell",
+      "command": "docker image inspect openclaw-agent >/dev/null 2>&1 || docker build -t openclaw-agent .; export $(grep -v '^#' ${workspaceFolder}/.env | grep -v '^$' | xargs) && docker run -d --name openclaw_agent -e WORKSPACE_REPO -e GIT_TOKEN -e GIT_USER -e OUTLINE_URL -e OUTLINE_TOKEN -e OUTLINE_ROOT_DOC -e ALLOWED_ORIGINS -e SYNC_MODE -e GATEWAY_TOKEN -e OPENCLAW_HOME=/data/openclaw -p 3349:3000 -v openclaw_agent_state:/data/openclaw --tty --interactive openclaw-agent",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stop Docker",
+      "type": "shell",
+      "command": "docker stop openclaw_agent && docker rm openclaw_agent",
+      "problemMatcher": []
+    },
+    {
+      "label": "Restart Docker",
+      "type": "shell",
+      "command": "docker image inspect openclaw-agent >/dev/null 2>&1 || docker build -t openclaw-agent .; docker container inspect openclaw_agent >/dev/null 2>&1 && docker restart openclaw_agent || (export $(grep -v '^#' ${workspaceFolder}/.env | grep -v '^$' | xargs) && docker run -d --name openclaw_agent -e WORKSPACE_REPO -e GIT_TOKEN -e GIT_USER -e OUTLINE_URL -e OUTLINE_TOKEN -e OUTLINE_ROOT_DOC -e ALLOWED_ORIGINS -e SYNC_MODE -e GATEWAY_TOKEN -e OPENCLAW_HOME=/data/openclaw -p 3349:3000 -v openclaw_agent_state:/data/openclaw --tty --interactive openclaw-agent)",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: Build",
+      "type": "shell",
+      "command": "docker compose build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: Run",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: Stop",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: Restart",
+      "type": "shell",
+      "command": "docker compose restart",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: Build & Run",
+      "type": "shell",
+      "command": "docker compose up -d --build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: Logs",
+      "type": "shell",
+      "command": "docker compose logs -f",
+      "problemMatcher": [],
+      "isBackground": true
+    },
+    {
+      "label": "WSL Docker Compose: Build",
+      "type": "shell",
+      "command": "wsl docker compose build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "WSL Docker Compose: Run",
+      "type": "shell",
+      "command": "wsl docker compose up -d",
+      "problemMatcher": []
+    },
+    {
+      "label": "WSL Docker Compose: Stop",
+      "type": "shell",
+      "command": "wsl docker compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "WSL Docker Compose: Restart",
+      "type": "shell",
+      "command": "wsl docker compose restart",
+      "problemMatcher": []
+    },
+    {
+      "label": "WSL Docker Compose: Build & Run",
+      "type": "shell",
+      "command": "wsl docker compose up -d --build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "WSL Docker Compose: Logs",
+      "type": "shell",
+      "command": "wsl docker compose logs -f",
+      "problemMatcher": [],
+      "isBackground": true
+    },
+    {
+      "label": "Docker: Publish",
+      "type": "shell",
+      "command": "docker build -t ${input:dockerUser}/openclaw-agent:latest . && docker push ${input:dockerUser}/openclaw-agent:latest",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "WSL Docker: Publish",
+      "type": "shell",
+      "command": "wsl docker build -t ${input:dockerUser}/openclaw-agent:latest . && wsl docker push ${input:dockerUser}/openclaw-agent:latest",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "dockerUser",
+      "type": "promptString",
+      "description": "Docker Hub username for publishing"
+    }
+  ]
+}

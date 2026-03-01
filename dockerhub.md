@@ -86,6 +86,24 @@ Map it to any host port you like (e.g., `-p 3349:3000`).
 |------|-------------|
 | `/data/openclaw` | Persistent storage for credentials, config, and session data |
 
+## Mounting Local Files
+
+Mount a local directory into the agent's workspace so it can read, edit, and create files on your machine:
+
+```bash
+docker run -d \
+  --name my_agent \
+  -e WORKSPACE_REPO=https://github.com/your-org/your-agent-repo \
+  -e OPENCLAW_HOME=/data/openclaw \
+  -p 3349:3000 \
+  -v openclaw_agent_state:/data/openclaw \
+  -v /path/to/your/project:/data/openclaw/.openclaw/workspace/work \
+  --tty --interactive \
+  your-image-name:latest
+```
+
+The mount must be inside `/data/openclaw/.openclaw/workspace/` — this is the agent's workspace path, so anything inside it is accessible without permission prompts. The `work` subdirectory is the agent's default working directory, putting your files right where it operates. Changes are synced in real time — files the agent creates appear on your local disk, and local edits are immediately visible to the agent.
+
 ## Authentication
 
 The gateway requires a token to connect. The default token is set in your agent repo's `openclaw/openclaw.json` under `gateway.auth.token`.

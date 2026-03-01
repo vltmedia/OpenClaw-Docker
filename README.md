@@ -216,6 +216,48 @@ docker volume rm openclaw_agent_state
 | `ALLOWED_ORIGINS` | No | Comma-separated list of allowed CORS origins for the Control UI |
 | `GATEWAY_TOKEN` | No | Override the gateway auth token at runtime |
 
+## Mounting Local Files
+
+You can mount a local directory into the agent's workspace so it can read, edit, and create files on your machine. The mount must be inside the agent's workspace path (`/data/openclaw/.openclaw/workspace/`) — this lets the agent access the files without additional permission prompts.
+
+### Docker Compose
+
+Add a bind mount under `volumes` in your `docker-compose.yml`:
+
+```yaml
+volumes:
+  - openclaw_agent_state:/data/openclaw
+  - /path/to/your/project:/data/openclaw/.openclaw/workspace/work
+```
+
+### Plain Docker
+
+```bash
+docker run -d \
+  --name my_agent \
+  -e WORKSPACE_REPO=https://github.com/your-org/your-agent-repo \
+  -e OPENCLAW_HOME=/data/openclaw \
+  -p 3349:3000 \
+  -v openclaw_agent_state:/data/openclaw \
+  -v /path/to/your/project:/data/openclaw/.openclaw/workspace/work \
+  --tty --interactive \
+  openclaw-agent
+```
+
+### How it works
+
+- The agent's workspace is `/data/openclaw/.openclaw/workspace/`. Anything inside this path is accessible to the agent without permission prompts.
+- `/data/openclaw/.openclaw/workspace/work` is the agent's default working directory — mounting here puts your files right where the agent operates.
+- Files the agent creates or edits in `work/` will appear on your local disk in real time, and vice versa.
+- You can mount to any subdirectory inside the workspace (e.g., `workspace/data`, `workspace/docs`) if you want to keep your files separate from the agent's working directory.
+- The persistent volume (`openclaw_agent_state`) still handles credentials, config, and session state separately — your mounted directory is not affected by factory resets unless you delete it yourself.
+
+### Example use cases
+
+- Mount a codebase for the agent to review, refactor, or generate code in
+- Mount a data directory for the agent to analyze or transform files
+- Mount a docs folder for the agent to read as reference material while working
+
 ## Private Repositories
 
 To use a private Git repo as your agent source, set `GIT_TOKEN` in your `.env`:

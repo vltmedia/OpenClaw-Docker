@@ -2,7 +2,7 @@
 FROM node:22-slim
 
 ENV OPENCLAW_HOME=/data/openclaw \
-    WORKSPACE=/data/openclaw/.openclaw/workspace/work \
+    WORKSPACE=/data/openclaw/.openclaw/workspace \
     WORKSPACE_REPO_DIR=/data/repo
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

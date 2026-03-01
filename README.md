@@ -1,6 +1,6 @@
 # OpenClaw Agent Server — Repo-Driven Docker Deployment
 
-A generic Docker deployment of an [\OpenClaw](https://docs.openclaw.ai) agent that pulls its entire identity — config, skills, memory, plugins, and workspace files — from a Git repository at runtime. One image, any agent. Just point `WORKSPACE_REPO` at a repo with an `openclaw/` directory.
+A generic Docker deployment of an [OpenClaw](https://docs.openclaw.ai) agent that pulls its entire identity — config, skills, memory, plugins, and workspace files — from a Git repository at runtime. One image, any agent. Just point `WORKSPACE_REPO` at a repo with an `openclaw/` directory.
 
 ## How It Works
 

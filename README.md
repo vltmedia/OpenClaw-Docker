@@ -62,11 +62,15 @@ Any files or directories you place in `workspace/` will be copied into the agent
 cp .env.example .env
 ```
 
-Edit `.env` and set:
+Edit `.env` and set your agent repo and API key:
 
 ```
 WORKSPACE_REPO=https://github.com/your-org/your-agent-repo
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GATEWAY_TOKEN=my-secret-token
 ```
+
+That's the minimum — the entrypoint handles everything else automatically. See [Environment Variables](#environment-variables) for the full list of options.
 
 ### 2. Build and start the container
 
@@ -74,30 +78,9 @@ WORKSPACE_REPO=https://github.com/your-org/your-agent-repo
 docker compose up --build -d
 ```
 
-### 3. Run onboarding (first time only)
+The container will clone the repo, merge the config, provision the API key, and start the gateway. No manual onboarding needed.
 
-The agent needs your LLM API key stored in its credential store. Shell into the running container and run the onboard wizard:
-
-```bash
-docker compose exec outline_claw openclaw onboard
-```
-
-This walks you through:
-- Accepting the terms
-- Selecting your model provider (OpenAI or Anthropic)
-- Entering your API key
-
-The key is saved inside the persistent Docker volume, so you only need to do this once.
-
-### 4. Restart the gateway
-
-After onboarding, restart so the gateway picks up the new credentials:
-
-```bash
-docker compose restart
-```
-
-### 5. Open the Control UI
+### 3. Open the Control UI
 
 Navigate to:
 
@@ -168,6 +151,8 @@ docker volume create openclaw_agent_state
 docker run -d \
   --name my_agent \
   -e WORKSPACE_REPO=https://github.com/your-org/your-agent-repo \
+  -e OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+  -e GATEWAY_TOKEN=my-secret-token \
   -e OPENCLAW_HOME=/data/openclaw \
   -p 3349:3000 \
   -v openclaw_agent_state:/data/openclaw \
@@ -175,14 +160,7 @@ docker run -d \
   openclaw-agent
 ```
 
-### 4. Run onboarding (first time only)
-
-```bash
-docker exec -it my_agent openclaw onboard
-docker restart my_agent
-```
-
-### 5. Open the Control UI
+### 4. Open the Control UI
 
 Navigate to `http://localhost:3349` and enter the auth token.
 
@@ -207,14 +185,47 @@ docker volume rm openclaw_agent_state
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `WORKSPACE_REPO` | Yes | Git URL for the agent definition repo (must contain an `openclaw/` directory) |
-| `GIT_TOKEN` | No | Git access token for cloning private repos (GitHub PAT, GitLab token, etc.) |
-| `GIT_USER` | No | Git username for private repo auth (default: `git`) |
-| `OPENCLAW_HOME` | No | OpenClaw data directory (default: `/data/openclaw`) |
-| `ALLOWED_ORIGINS` | No | Comma-separated list of allowed CORS origins for the Control UI |
-| `GATEWAY_TOKEN` | No | Override the gateway auth token at runtime |
+All configuration is done through environment variables. Set them in your `.env` file, `docker-compose.yml`, or pass them with `-e` flags. The entrypoint patches everything at runtime so credentials and config survive container recreation (e.g., Coolify redeploys) without needing to run `openclaw onboard`.
+
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `WORKSPACE_REPO` | Git URL for the agent definition repo (must contain an `openclaw/` directory) |
+
+### LLM API Keys
+
+Set at least one of these. The entrypoint writes the key directly into the agent's auth store, replacing the need for `openclaw onboard`.
+
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key — required if your agent uses an OpenAI model (e.g., `gpt-5.1-codex`) |
+| `ANTHROPIC_API_KEY` | Anthropic API key — required if your agent uses a Claude model |
+
+### Integrations
+
+| Variable | Description |
+|----------|-------------|
+| `DISCORD_BOT_TOKEN` | Discord bot token — enables the agent as a Discord bot |
+| `OUTLINE_URL` | Outline instance base URL (e.g., `https://docs.example.com`) |
+| `OUTLINE_TOKEN` | Outline API token for the `outline_tools` plugin |
+| `OUTLINE_ROOT_DOC` | Outline root document URL for the `outline_tools` plugin |
+
+### Gateway & Access
+
+| Variable | Description |
+|----------|-------------|
+| `GATEWAY_TOKEN` | Override the gateway auth token at runtime |
+| `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins for the Control UI |
+
+### Git & Repo
+
+| Variable | Description |
+|----------|-------------|
+| `GIT_TOKEN` | Git access token for cloning private repos (GitHub PAT, GitLab token, etc.) |
+| `GIT_USER` | Git username for private repo auth (default: `git`) |
+| `SYNC_MODE` | Set to `true` to force-refresh config/skills/plugins from the repo (repo wins on conflict) |
+| `OPENCLAW_HOME` | OpenClaw data directory (default: `/data/openclaw`) |
 
 ## Mounting Local Files
 
@@ -320,13 +331,12 @@ Then update `gateway.controlUi.allowedOrigins` in your agent repo's `openclaw.js
 ### Persistent data
 
 The Docker volume persists:
-- OpenClaw credentials (from onboarding)
 - Session history and memory
 - Config and workspace files (merged from repo on each boot)
 
 ### Factory reset
 
-If you need to start completely fresh, stop the container and delete the volume. **Be careful — this is a full factory reset** that deletes all onboarded credentials, session history, memory, runtime config changes, and any skills or plugins added via the UI. You will need to re-run onboarding afterward.
+If you need to start completely fresh, stop the container and delete the volume. **Be careful — this is a full factory reset** that deletes all session history, memory, runtime config changes, and any skills or plugins added via the UI. Since credentials are set via env vars, you don't need to re-onboard — just start the container again.
 
 ```bash
 # Docker Compose
@@ -355,10 +365,5 @@ Verify the skill was copied:
 docker compose exec outline_claw ls /data/openclaw/.openclaw/workspace/skills/
 ```
 
-### Onboarding credentials lost
-If you removed the Docker volume, re-run onboarding:
-
-```bash
-docker compose exec outline_claw openclaw onboard
-docker compose restart
-```
+### API key not working after redeploy
+Make sure `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` is set in your environment variables. The entrypoint provisions the key on every boot, so it survives container recreation automatically.

@@ -240,6 +240,18 @@ fi
 echo "Removing cloned repo (already merged into .openclaw)..."
 rm -rf "$WORKSPACE_REPO_DIR"
 
+# ── Sync persisted volume state to /root/.openclaw ───────────────────
+# /root/.openclaw/ lives in the container filesystem (not the volume), so it gets
+# wiped when the container is recreated (e.g., Coolify redeploy). Copy the
+# persisted config from the volume so onboarded credentials, runtime changes,
+# and session state survive container recreation.
+echo "Syncing persisted state from volume to /root/.openclaw..."
+if [ -f /data/openclaw/.openclaw/openclaw.json ]; then
+  cp /data/openclaw/.openclaw/openclaw.json /root/.openclaw/openclaw.json
+fi
+overlay_dir_force /data/openclaw/.openclaw/workspace /root/.openclaw/workspace
+overlay_dir_force /data/openclaw/.openclaw/plugins /root/.openclaw/plugins
+
 # ── Runtime patches (env var overrides) ──────────────────────────────
 
 # Always enable gateway control UI access
@@ -312,6 +324,108 @@ if [ -n "$OUTLINE_URL" ] && [ -n "$OUTLINE_TOKEN" ]; then
     fi
   done
   echo "Patched outline_tools plugin config (baseUrl, apiToken, rootDoc)"
+fi
+
+# Patch LLM API keys if set via env vars (replaces need for `openclaw onboard`)
+if [ -n "$OPENAI_API_KEY" ] || [ -n "$ANTHROPIC_API_KEY" ]; then
+  # Ensure agent directories exist
+  mkdir -p /data/openclaw/.openclaw/agents/main/agent
+  mkdir -p /root/.openclaw/agents/main/agent
+
+  for agent_dir in /data/openclaw/.openclaw/agents/main/agent /root/.openclaw/agents/main/agent; do
+    AUTH_FILE="$agent_dir/auth-profiles.json"
+
+    # Read existing or start fresh
+    if [ -f "$AUTH_FILE" ]; then
+      EXISTING=$(cat "$AUTH_FILE")
+    else
+      EXISTING="{}"
+    fi
+
+    node -e "
+      const fs = require('fs');
+      const auth = $EXISTING;
+
+      if ('$OPENAI_API_KEY') {
+        auth['openai:default'] = {
+          provider: 'openai',
+          mode: 'api_key',
+          apiKey: '$OPENAI_API_KEY'
+        };
+      }
+
+      if ('$ANTHROPIC_API_KEY') {
+        auth['anthropic:default'] = {
+          provider: 'anthropic',
+          mode: 'api_key',
+          apiKey: '$ANTHROPIC_API_KEY'
+        };
+      }
+
+      fs.writeFileSync('$AUTH_FILE', JSON.stringify(auth, null, 2) + '\n');
+    "
+  done
+  echo "Patched LLM API keys from env vars"
+
+  # Also patch the auth profiles in openclaw.json so the provider is registered
+  for cfg in /data/openclaw/.openclaw/openclaw.json /root/.openclaw/openclaw.json; do
+    if [ -f "$cfg" ]; then
+      node -e "
+        const fs = require('fs');
+        const cfg = JSON.parse(fs.readFileSync('$cfg', 'utf8'));
+        cfg.auth = cfg.auth || {};
+        cfg.auth.profiles = cfg.auth.profiles || {};
+
+        if ('$OPENAI_API_KEY') {
+          cfg.auth.profiles['openai:default'] = {
+            provider: 'openai',
+            mode: 'api_key'
+          };
+        }
+
+        if ('$ANTHROPIC_API_KEY') {
+          cfg.auth.profiles['anthropic:default'] = {
+            provider: 'anthropic',
+            mode: 'api_key'
+          };
+        }
+
+        fs.writeFileSync('$cfg', JSON.stringify(cfg, null, 2) + '\n');
+      "
+    fi
+  done
+fi
+
+# Clean up stale config keys from previous versions
+for cfg in /data/openclaw/.openclaw/openclaw.json /root/.openclaw/openclaw.json; do
+  if [ -f "$cfg" ]; then
+    node -e "
+      const fs = require('fs');
+      const cfg = JSON.parse(fs.readFileSync('$cfg', 'utf8'));
+      if (cfg.messages && cfg.messages.discord) {
+        delete cfg.messages.discord;
+        fs.writeFileSync('$cfg', JSON.stringify(cfg, null, 2) + '\n');
+      }
+    "
+  fi
+done
+
+# Patch Discord bot token if DISCORD_BOT_TOKEN is set
+if [ -n "$DISCORD_BOT_TOKEN" ]; then
+  for cfg in /data/openclaw/.openclaw/openclaw.json /root/.openclaw/openclaw.json; do
+    if [ -f "$cfg" ]; then
+      node -e "
+        const fs = require('fs');
+        const cfg = JSON.parse(fs.readFileSync('$cfg', 'utf8'));
+        cfg.channels = cfg.channels || {};
+        cfg.channels.discord = cfg.channels.discord || {};
+        cfg.channels.discord.enabled = true;
+        cfg.channels.discord.token = '$DISCORD_BOT_TOKEN';
+        fs.writeFileSync('$cfg', JSON.stringify(cfg, null, 2) + '\n');
+      "
+    fi
+  done
+  echo "Patched Discord bot token"
 fi
 
 # ── Launch ───────────────────────────────────────────────────────────

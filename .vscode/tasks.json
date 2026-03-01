@@ -11,7 +11,7 @@
     {
       "label": "Run Docker",
       "type": "shell",
-      "command": "docker image inspect openclaw-agent >/dev/null 2>&1 || docker build -t openclaw-agent .; export $(grep -v '^#' ${workspaceFolder}/.env | grep -v '^$' | xargs) && docker run -d --name openclaw_agent -e WORKSPACE_REPO -e GIT_TOKEN -e GIT_USER -e OUTLINE_URL -e OUTLINE_TOKEN -e OUTLINE_ROOT_DOC -e ALLOWED_ORIGINS -e SYNC_MODE -e GATEWAY_TOKEN -e OPENCLAW_HOME=/data/openclaw -p 3349:3000 -v openclaw_agent_state:/data/openclaw --tty --interactive openclaw-agent",
+      "command": "docker image inspect openclaw-agent >/dev/null 2>&1 || docker build -t openclaw-agent .; export $(grep -v '^#' ${workspaceFolder}/.env | grep -v '^$' | xargs) && docker run -d --name openclaw_agent -e WORKSPACE_REPO -e GIT_TOKEN -e GIT_USER -e OPENAI_API_KEY -e ANTHROPIC_API_KEY -e DISCORD_BOT_TOKEN -e OUTLINE_URL -e OUTLINE_TOKEN -e OUTLINE_ROOT_DOC -e ALLOWED_ORIGINS -e SYNC_MODE -e GATEWAY_TOKEN -e OPENCLAW_HOME=/data/openclaw -p 3349:3000 -v openclaw_agent_state:/data/openclaw --tty --interactive openclaw-agent",
       "problemMatcher": []
     },
     {
@@ -23,7 +23,7 @@
     {
       "label": "Restart Docker",
       "type": "shell",
-      "command": "docker image inspect openclaw-agent >/dev/null 2>&1 || docker build -t openclaw-agent .; docker container inspect openclaw_agent >/dev/null 2>&1 && docker restart openclaw_agent || (export $(grep -v '^#' ${workspaceFolder}/.env | grep -v '^$' | xargs) && docker run -d --name openclaw_agent -e WORKSPACE_REPO -e GIT_TOKEN -e GIT_USER -e OUTLINE_URL -e OUTLINE_TOKEN -e OUTLINE_ROOT_DOC -e ALLOWED_ORIGINS -e SYNC_MODE -e GATEWAY_TOKEN -e OPENCLAW_HOME=/data/openclaw -p 3349:3000 -v openclaw_agent_state:/data/openclaw --tty --interactive openclaw-agent)",
+      "command": "docker image inspect openclaw-agent >/dev/null 2>&1 || docker build -t openclaw-agent .; docker container inspect openclaw_agent >/dev/null 2>&1 && docker restart openclaw_agent || (export $(grep -v '^#' ${workspaceFolder}/.env | grep -v '^$' | xargs) && docker run -d --name openclaw_agent -e WORKSPACE_REPO -e GIT_TOKEN -e GIT_USER -e OPENAI_API_KEY -e ANTHROPIC_API_KEY -e DISCORD_BOT_TOKEN -e OUTLINE_URL -e OUTLINE_TOKEN -e OUTLINE_ROOT_DOC -e ALLOWED_ORIGINS -e SYNC_MODE -e GATEWAY_TOKEN -e OPENCLAW_HOME=/data/openclaw -p 3349:3000 -v openclaw_agent_state:/data/openclaw --tty --interactive openclaw-agent)",
       "problemMatcher": []
     },
     {

@@ -8,6 +8,8 @@ A generic, repo-driven Docker image for running [OpenClaw](https://docs.openclaw
 docker run -d \
   --name my_agent \
   -e WORKSPACE_REPO=https://github.com/your-org/your-agent-repo \
+  -e OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+  -e GATEWAY_TOKEN=my-secret-token \
   -e OPENCLAW_HOME=/data/openclaw \
   -p 3349:3000 \
   -v openclaw_agent_state:/data/openclaw \
@@ -15,14 +17,7 @@ docker run -d \
   your-image-name:latest
 ```
 
-Then run onboarding to set up your API key (first time only):
-
-```bash
-docker exec -it my_agent openclaw onboard
-docker restart my_agent
-```
-
-Open the Control UI at **http://localhost:3349** and enter the auth token from your agent repo's `openclaw.json`.
+Open the Control UI at **http://localhost:3349** and enter the gateway token. No onboarding needed — the API key is provisioned automatically from the env var.
 
 ## How It Works
 
@@ -31,10 +26,11 @@ On every container start:
 1. Clones (or pulls) the repo from `WORKSPACE_REPO`
 2. Seeds (first run) or merges (subsequent runs) the `openclaw/` directory into the running config
 3. Removes the cloned repo to keep the workspace clean
-4. Applies runtime env var patches (tokens, CORS origins)
-5. Starts the OpenClaw Gateway
+4. Provisions API keys, Discord tokens, and plugin configs from env vars
+5. Applies runtime patches (gateway token, CORS origins)
+6. Starts the OpenClaw Gateway
 
-On subsequent boots, `openclaw.json` is deep-merged — repo values win, but runtime-only keys (like onboarded credentials) are preserved. Workspace files, skills, memory, and plugins are overlaid (repo wins on name conflicts, existing files not in the repo are kept).
+All credentials are set from environment variables on every boot, so they survive container recreation (e.g., Coolify redeploys, `docker compose up --force-recreate`) without needing to re-run onboarding.
 
 ## Agent Repo Structure
 
@@ -63,14 +59,47 @@ Any files or directories in `workspace/` are copied into the agent's working dir
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `WORKSPACE_REPO` | Yes | Git URL for the agent definition repo (must contain `openclaw/`) |
-| `GIT_TOKEN` | No | Git access token for cloning private repos (GitHub PAT, GitLab token, etc.) |
-| `GIT_USER` | No | Git username for private repo auth (default: `git`) |
-| `OPENCLAW_HOME` | No | OpenClaw data directory (default: `/data/openclaw`) |
-| `ALLOWED_ORIGINS` | No | Comma-separated list of allowed CORS origins for the Control UI |
-| `GATEWAY_TOKEN` | No | Override the gateway auth token at runtime |
+All configuration is done through environment variables. The entrypoint patches everything at runtime, so credentials and config survive container recreation without manual setup.
+
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `WORKSPACE_REPO` | Git URL for the agent definition repo (must contain `openclaw/`) |
+
+### LLM API Keys
+
+Set at least one. The entrypoint writes the key directly into the agent's auth store — no `openclaw onboard` needed.
+
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key — required if your agent uses an OpenAI model (e.g., `gpt-5.1-codex`) |
+| `ANTHROPIC_API_KEY` | Anthropic API key — required if your agent uses a Claude model |
+
+### Integrations
+
+| Variable | Description |
+|----------|-------------|
+| `DISCORD_BOT_TOKEN` | Discord bot token — enables the agent as a Discord bot |
+| `OUTLINE_URL` | Outline instance base URL (e.g., `https://docs.example.com`) |
+| `OUTLINE_TOKEN` | Outline API token for the `outline_tools` plugin |
+| `OUTLINE_ROOT_DOC` | Outline root document URL for the `outline_tools` plugin |
+
+### Gateway & Access
+
+| Variable | Description |
+|----------|-------------|
+| `GATEWAY_TOKEN` | Override the gateway auth token at runtime |
+| `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins for the Control UI |
+
+### Git & Repo
+
+| Variable | Description |
+|----------|-------------|
+| `GIT_TOKEN` | Git access token for cloning private repos (GitHub PAT, GitLab token, etc.) |
+| `GIT_USER` | Git username for private repo auth (default: `git`) |
+| `SYNC_MODE` | Set to `true` to force-refresh config/skills/plugins from the repo (repo wins on conflict) |
+| `OPENCLAW_HOME` | OpenClaw data directory (default: `/data/openclaw`) |
 
 ## Ports
 
@@ -94,6 +123,7 @@ Mount a local directory into the agent's workspace so it can read, edit, and cre
 docker run -d \
   --name my_agent \
   -e WORKSPACE_REPO=https://github.com/your-org/your-agent-repo \
+  -e OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
   -e OPENCLAW_HOME=/data/openclaw \
   -p 3349:3000 \
   -v openclaw_agent_state:/data/openclaw \
@@ -106,52 +136,24 @@ The mount must be inside `/data/openclaw/.openclaw/workspace/` — this is the a
 
 ## Authentication
 
-The gateway requires a token to connect. The default token is set in your agent repo's `openclaw/openclaw.json` under `gateway.auth.token`.
-
-Override the token and allowed origins via environment variables — no rebuild needed:
+The gateway requires a token to connect. Set `GATEWAY_TOKEN` in your environment:
 
 ```bash
-docker run -d \
-  --name my_agent \
-  -e WORKSPACE_REPO=https://github.com/your-org/your-agent-repo \
-  -e OPENCLAW_HOME=/data/openclaw \
-  -e GATEWAY_TOKEN=my-secret-token \
-  -e ALLOWED_ORIGINS="http://localhost:3349,https://myhost.example.com" \
-  -p 3349:3000 \
-  -v openclaw_agent_state:/data/openclaw \
-  --tty --interactive \
-  your-image-name:latest
+-e GATEWAY_TOKEN=my-secret-token
 ```
 
-## Onboarding
-
-First time you run the container, register your LLM provider credentials:
+To allow access from additional origins (e.g., remote hosts):
 
 ```bash
-docker exec -it my_agent openclaw onboard
+-e ALLOWED_ORIGINS="http://localhost:3349,https://myhost.example.com"
 ```
-
-The wizard asks you to:
-1. Accept the terms
-2. Choose a model provider (OpenAI or Anthropic)
-3. Enter your API key
-
-Credentials are stored in the persistent volume — you only need to do this once unless you remove the volume.
 
 ## Private Repositories
 
 To clone from a private repo, set `GIT_TOKEN`:
 
 ```bash
-docker run -d \
-  --name my_agent \
-  -e WORKSPACE_REPO=https://github.com/your-org/private-agent-repo \
-  -e GIT_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
-  -e OPENCLAW_HOME=/data/openclaw \
-  -p 3349:3000 \
-  -v openclaw_agent_state:/data/openclaw \
-  --tty --interactive \
-  your-image-name:latest
+-e GIT_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 Works with GitHub PATs, GitLab tokens (`GIT_USER=oauth2`), Gitea tokens, etc. If `GIT_TOKEN` is not set, credentials are skipped (public repos only).
@@ -164,9 +166,13 @@ services:
     image: your-image-name:latest
     environment:
       WORKSPACE_REPO: https://github.com/your-org/your-agent-repo
+      OPENAI_API_KEY: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      # ANTHROPIC_API_KEY: sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx
+      # DISCORD_BOT_TOKEN: your-discord-bot-token
+      GATEWAY_TOKEN: my-secret-token
       OPENCLAW_HOME: /data/openclaw
       # ALLOWED_ORIGINS: "http://localhost:3349,https://myhost.example.com"
-      # GATEWAY_TOKEN: "my-secret-token"
+      # SYNC_MODE: "true"
     ports:
       - "3349:3000"
     volumes:
@@ -180,12 +186,14 @@ volumes:
 
 ## Factory Reset
 
-If you need to start completely fresh, stop the container and delete the volume. **Be careful — this is a full factory reset** that deletes all onboarded credentials, session history, memory, runtime config changes, and any skills or plugins added via the UI. You will need to re-run onboarding afterward.
+If you need to start completely fresh, stop the container and delete the volume. **Be careful — this is a full factory reset** that deletes all session history, memory, runtime config changes, and any skills or plugins added via the UI.
 
 ```bash
 docker stop my_agent && docker rm my_agent
 docker volume rm openclaw_agent_state
 ```
+
+Since all credentials are set via env vars, you don't need to re-run onboarding after a reset — just start the container again.
 
 ## Links
 

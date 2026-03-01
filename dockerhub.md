@@ -172,4 +172,4 @@ docker volume rm openclaw_agent_state
 ## Links
 
 - [OpenClaw Documentation](https://docs.openclaw.ai)
-- [Source & Dockerfile](https://github.com/your-org/this-repo)
+- [Source & Dockerfile](https://github.com/vltmedia/OpenClaw-Docker)

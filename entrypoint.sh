@@ -32,6 +32,18 @@ else
   git submodule update --init --recursive
 fi
 
+# ── Run build.sh if present (first run or sync mode only) ────────────
+if [ -f "$WORKSPACE_REPO_DIR/build.sh" ]; then
+  if [ ! -f /data/openclaw/.openclaw/flag.json ] || [ "$SYNC_MODE" = "true" ]; then
+    echo "Running build.sh from workspace repo..."
+    chmod +x "$WORKSPACE_REPO_DIR/build.sh"
+    (cd "$WORKSPACE_REPO_DIR" && ./build.sh)
+    echo "build.sh completed"
+  else
+    echo "Skipping build.sh (normal run, not sync mode)"
+  fi
+fi
+
 REPO_OPENCLAW="$WORKSPACE_REPO_DIR/openclaw"
 
 if [ ! -d "$REPO_OPENCLAW" ]; then

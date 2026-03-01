@@ -24,11 +24,12 @@ Open the Control UI at **http://localhost:3349** and enter the gateway token. No
 On every container start:
 
 1. Clones (or pulls) the repo from `WORKSPACE_REPO`
-2. Seeds (first run) or merges (subsequent runs) the `openclaw/` directory into the running config
-3. Removes the cloned repo to keep the workspace clean
-4. Provisions API keys, Discord tokens, and plugin configs from env vars
-5. Applies runtime patches (gateway token, CORS origins)
-6. Starts the OpenClaw Gateway
+2. Runs `build.sh` if present in the repo root (first run and `SYNC_MODE=true` only)
+3. Seeds (first run) or merges (subsequent runs) the `openclaw/` directory into the running config
+4. Removes the cloned repo to keep the workspace clean
+5. Provisions API keys, Discord tokens, and plugin configs from env vars
+6. Applies runtime patches (gateway token, CORS origins)
+7. Starts the OpenClaw Gateway
 
 All credentials are set from environment variables on every boot, so they survive container recreation (e.g., Coolify redeploys, `docker compose up --force-recreate`) without needing to re-run onboarding.
 
@@ -38,6 +39,7 @@ Your `WORKSPACE_REPO` must contain an `openclaw/` directory:
 
 ```
 your-agent-repo/
+├── build.sh                       # Optional — runs on first boot and SYNC_MODE=true
 └── openclaw/
     ├── openclaw.json
     ├── plugins/
@@ -56,6 +58,10 @@ your-agent-repo/
 ```
 
 Any files or directories in `workspace/` are copied into the agent's working directory — add datasets, configs, reference docs, or anything else the agent should have access to.
+
+### Build Script (`build.sh`)
+
+If your agent repo has a `build.sh` in the root directory, the entrypoint runs it before merging — only on first boot and when `SYNC_MODE=true`. Use it for custom setup like cloning additional repos, compiling assets, or generating config. If `build.sh` fails (non-zero exit), the entrypoint stops.
 
 ## Environment Variables
 

@@ -7,10 +7,11 @@ A generic Docker deployment of an [OpenClaw](https://docs.openclaw.ai) agent tha
 On every container start the entrypoint:
 
 1. **Clones** (or pulls) the repo specified by `WORKSPACE_REPO`
-2. **Seeds** (first run) or **merges** (subsequent runs) the repo's `openclaw/` directory into the running OpenClaw config
-3. **Deletes** the cloned repo to avoid duplicate files confusing the agent
-4. **Applies** any runtime env var patches (`GATEWAY_TOKEN`, `ALLOWED_ORIGINS`)
-5. **Starts** the OpenClaw Gateway + Control UI
+2. **Runs `build.sh`** if present in the repo root (first run and `SYNC_MODE=true` only)
+3. **Seeds** (first run) or **merges** (subsequent runs) the repo's `openclaw/` directory into the running OpenClaw config
+4. **Deletes** the cloned repo to avoid duplicate files confusing the agent
+5. **Applies** any runtime env var patches (`GATEWAY_TOKEN`, `ALLOWED_ORIGINS`)
+6. **Starts** the OpenClaw Gateway + Control UI
 
 On subsequent runs, `openclaw.json` is deep-merged (repo values win, but runtime keys like onboarded credentials are preserved). Workspace files, skills, memory, and plugins are overlaid (repo wins on conflict, existing files not in the repo are kept).
 
@@ -23,6 +24,7 @@ Your `WORKSPACE_REPO` must contain an `openclaw/` directory at the root:
 
 ```
 your-agent-repo/
+├── build.sh                       # Optional — runs on first boot and SYNC_MODE=true
 └── openclaw/
     ├── openclaw.json              # Gateway + agent configuration
     ├── plugins/                   # Optional — plugin directories
@@ -47,6 +49,16 @@ your-agent-repo/
 ```
 
 Any files or directories you place in `workspace/` will be copied into the agent's working workspace — you can add datasets, configs, reference docs, or anything else the agent should have access to.
+
+### Build Script (`build.sh`)
+
+If your agent repo has a `build.sh` in the root directory, the entrypoint will run it **before** merging the `openclaw/` directory. This lets you do any custom setup — cloning additional repos, compiling assets, generating config files, installing dependencies, etc.
+
+`build.sh` only runs during:
+- **First boot** (no existing config)
+- **Sync mode** (`SYNC_MODE=true`)
+
+On normal subsequent boots it is skipped, since the build artifacts are already persisted on the volume. If `build.sh` exits with a non-zero status, the entire entrypoint stops — so you can use `exit 1` for validation (e.g., checking that required env vars are set).
 
 ## Prerequisites
 
